@@ -74,335 +74,39 @@ _shell:
 	_cmd_none:		
 	mov si, strCmd0
 	cmp BYTE [si], 0x00
-	jne	_cmd_ver		;next command
+	jne	_cmd_hinfo		;next command
 	jmp _cmd_done
 	
-	; display version
-	_cmd_ver:		
-	mov si, strCmd0
-	mov di, cmdVer
-	mov cx, 4
-	repe	cmpsb
-	jne	_cmd_displayHelpMenu		;next command
+	
+	jne	_cmd_hinfo		;test command
 	
 	call _display_endl
-	mov si, strOsName		;display version
-	mov al, 0x01
-    int 0x21
-	call _display_space
-	mov si, txtVersion		;display version
-	mov al, 0x01
-    int 0x21
-	call _display_space
-
-	mov si, strMajorVer		
-	mov al, 0x01
-    int 0x21
-	mov si, strMinorVer
-	mov al, 0x01
+    
     int 0x21
 	jmp _cmd_done
 	
-	
-	
-	
-	;display Help Menu
-	_cmd_displayHelpMenu:
-	call _display_endl		
+					
+    _cmd_hinfo:				;view hardware information					
 	mov si, strCmd0
+	mov di, cmdHInfo
+	mov cx, 6
+	repe	cmpsb
+	jne	_cmd_help
+	
+	call _display_endl
+	call _display_hardware_info				
+	jmp _cmd_done
+	
+    _cmd_help:				;view help
+    	mov si, strCmd0
 	mov di, cmdHelp
 	mov cx, 5
 	repe	cmpsb
-	jne	_cmd_info
-	
 	
 	call _display_endl
-	mov si, strHelpMsg1
-	mov al, 0x01
-	int 0x21
-	call _display_endl
-	mov si, strHelpMsg2
-	mov al, 0x01
-	int 0x21
-	call _display_endl
-	mov si, strHelpMsg3
-	mov al, 0x01
-	int 0x21
-	call _display_endl
-	jmp _cmd_done
-	
-	
-	;display hardware info
-	_cmd_info:
-	mov si, strCmd0
-	mov di, cmdInfo
-	mov cx, 5
-	repe	cmpsb
-	jne _cmd_exit
-	
-	call _display_endl
-	mov si, strInfoTitle
-	mov al, 0x01
-	int 0x21
-	call _display_endl
-	mov si, strTitleDesign
-	mov al, 0x01
-	int 0x21
-	call _display_endl
-	
-	call _cmd_cpuVendorID
-	call _cmd_ProcessorType
-	call _hard_info
-	call _serial_ports
-	call _memory
-	call _display_endl
-	call _display_endl
-	call _display_endl
-	mov si, strTitleDesign
-	mov al, 0x01
-	int 0x21
-	
-	
-	call _display_endl
-	jmp _cmd_done
-	ret
-	
-	_cmd_cpuVendorID:
-		call _display_endl
-		mov si,strcpuid
-		mov al, 0x01
-		int 0x21
-
-		mov eax,0
-		cpuid; call cpuid command
-		mov [strcpuid],ebx		; load last string
-		mov [strcpuid+4],edx;	 load middle string
-		mov [strcpuid+8],ecx		; load first string
-		;call _display_endl
-		mov si, strcpuid		;print CPU vender ID
-		mov al, 0x01
-		int 0x21
-		ret
-
-	_cmd_ProcessorType:
-		call _display_endl
-		mov si, strtypecpu
-		mov al, 0x01
-		int 0x21
-
-	
-		mov eax, 0x80000002		; get first part of the brand
-		cpuid
-		mov  [strcputype], eax
-		mov  [strcputype+4], ebx
-		mov  [strcputype+8], ecx
-		mov  [strcputype+12], edx
-
-		mov eax,0x80000003
-		cpuid; call cpuid command
-		mov [strcputype+16],eax
-		mov [strcputype+20],ebx
-		mov [strcputype+24],ecx
-		mov [strcputype+28],edx
-
-		mov eax,0x80000004
-		cpuid     ; call cpuid command
-		mov [strcputype+32],eax
-		mov [strcputype+36],ebx
-		mov [strcputype+40],ecx
-		mov [strcputype+44],edx
-
-		
-
-		mov si, strcputype           ;print processor type
-		mov al, 0x01
-		int 0x21
-		ret
-		
-		
-	_memory:
-		push ax
-		push bx
-		push cx
-		push dx
-		push es
-		push si
-
-		call _display_endl
-		mov si, strmemory	; Prints base memory string
-		mov al, 0x01
-		int 0x21
-		
-
-		; Reading Base Memory -----------------------------------------------
-		push ax
-		push dx
-		
-		int 0x12		; call interrupt 12 to get base mem size
-		mov dx,ax 
-		mov [basemem] , ax
-		call _print_dec		; display the number in decimal
-		mov al, 0x6b
-		mov ah, 0x0E            ; BIOS teletype acts on 'K' 
-		mov bh, 0x00
-		mov bl, 0x07
-		int 0x10
-		mov si, basemem	; Prints base memory string
-		mov al, 0x01
-		int 0x21
-		ret
-
-		
-		pop dx
-		pop ax
-
-		; Reading extended Memory
-		call _display_endl
-		mov si, strsmallextended
-		mov al, 0x01
-		int 0x21
-
-		xor cx, cx		; Clear CX
-		xor dx, dx		; clear DX
-		mov ax, 0xE801
-		int 0x15		; call interrupt 15h
-		mov dx, ax		; save memory value in DX as the procedure argument
-		mov [extmem1], ax
-		call _print_dec		; print the decimal value in DX
-		mov al, 0x6b
-		mov ah, 0x0E            ; BIOS teletype acts on 'K'
-		mov bh, 0x00
-		mov bl, 0x07
-		int 0x10
-
-		xor cx, cx		; clear CX
-		xor dx, dx		; clear DX
-		mov ax, 0xE801
-		int 0x15		; call interrupt 15h
-		mov ax, dx		; save memory value in AX for division
-		xor dx, dx
-		mov si , 16
-		div si			; divide AX value to get the number of MB
-		mov dx, ax
-		mov [extmem2], ax
-		push dx			; save dx value
-
-		call _display_endl
-		mov si, strbigextended
-		mov al, 0x01
-		int 0x21
-		
-		pop dx			; retrieve DX for printing
-		call _print_dec
-		mov al, 0x4D
-		mov ah, 0x0E            ; BIOS teletype acts on 'M'
-		mov bh, 0x00
-		mov bl, 0x07
-		int 0x10
-
-		call _display_endl
-		mov si, strtotalmemory
-		mov al, 0x01
-		int 0x21
-
-		; total memory = basemem + extmem1 + extmem2
-		mov ax, [basemem]	
-		add ax, [extmem1]	; ax = ax + extmem1
-		shr ax, 10
-		add ax, [extmem2]	; ax = ax + extmem2
-		mov dx, ax
-		call _print_dec
-		mov al, 0x4D            
-		mov ah, 0x0E            ; BIOS teletype acts on 'M'
-		mov bh, 0x00
-		mov bl, 0x07
-		int 0x10
-		pop si
-		pop es
-		pop dx
-		pop cx
-		pop bx
-		pop ax
-		ret
-
-	
-
-		
-	_hard_info:
-		call _display_endl
-		mov si, strhdnumber
-		mov al, 0x01
-		int 0x21
-
-		mov ax,0040h             ; look at 0040:0075 for a number
-		mov es,ax                ;
-		mov dl,[es:0075h]        ; move the number into DL register
-		add dl,30h		; add 48 to get ASCII value            
-		mov al, dl
-		mov ah, 0x0E            ; BIOS teletype acts on character 
-		mov bh, 0x00
-		mov bl, 0x07
-		int 0x10
-		ret
-
-	_serial_ports:
-		call _display_endl
-		mov si, strserialportnumber
-		mov al, 0x01
-		int 0x21
-
-		mov ax, [es:0x10]
-		shr ax, 9
-		and ax, 0x0007
-		add al, 30h
-		mov ah, 0x0E            ; BIOS teletype acts on character
-		mov bh, 0x00
-		mov bl, 0x07
-		int 0x10
-		ret
-
-
-		; Reading base I/O addresses
-		;Base I/O address for serial port 1 (communications port 1 - COM 1)
-		mov ax, [es:0000h]	; Read address for serial port 1
-		cmp ax, 0
-		je _end
-		call _display_endl
-		mov si, strserialport1
-		mov al, 0x01
-		int 0x21	
-
-		mov dx, ax
-		call _print_dec
-		
-		_end:
-		;Base I/O address for serial port 1 (communications port 1 - COM 1)	
-		
-		call _display_endl
-
-		pop si
-		pop es
-		pop dx
-		pop cx
-		pop bx
-		pop ax
-		
-
-		
-	
-
-	; exit shell
-	_cmd_exit:		
-	mov si, strCmd0
-	mov di, cmdExit
-	mov cx, 5
-	repe	cmpsb
-	jne	_cmd_unknown		;next command
-
-	mov ax, 5307h
-	mov cx, 3
- 	mov bx, 1
-	int 15h	
+	call _display_help				
+	jmp _cmd_done	
+					
 
 	_cmd_unknown:
 	call _display_endl
@@ -412,9 +116,8 @@ _shell:
 
 	_cmd_done:
 
-	call _display_endl
+	;call _display_endl
 	jmp _shell_begin
-	ret 
 	
 	_shell_end:
 	ret
@@ -671,89 +374,357 @@ _display_prompt:
 	mov al, 0x01
 	int 0x21
 	ret
+
+;***************************************************************************************
+;display the hardaware information - invoked by hinfo command
+
+_display_hardware_info:
+	call _display_endl
+	mov si, strHInfo
+	mov al, 0x01
+	int 0x21
+
+	call _display_endl
 	
-_print_dec:
-	push ax			; save AX
-	push cx			; save CX
-	push si			; save SI
-	mov ax,dx		; copy number to AX
-	mov si,10		; SI is used as the divisor
-	xor cx,cx		; clear CX
+	;read low memory
+	call _show_CPU_VendorID			;show CPU vendor ID
+	call _show_Processor_Brand		;show CPU Brand
+	call _show_floppy_info			;show floppy drive related info
+	call _show_serial_info			;show info of serial port(s)
+	call _show_parallel_info		;show info of parallel port(s)
+	call _show_memory_info			;show memory related info
+	call _show_HDD_info			;show HDD related info
+
+	call _display_endl
 	ret
+;end
 	
+_show_CPU_VendorID:
+	;******************read CPU vendor ID
+	mov eax,0
+	cpuid
+	mov [vendorID], ebx
+	mov [vendorID+4],edx
+	mov [vendorID+8],ecx		
+	
+	call _display_endl
+	mov si, strVendorID
+	mov al, 0x01
+     int 0x21
+     	
+     	call _display_space
+	mov si, vendorID		;print CPU vender ID
+	mov al, 0x01
+    int 0x21
+	ret
+;end
+
+_show_Processor_Brand:
+	;******************read processor brand
+	mov eax,0x80000002
+	cpuid				;get the processor brand string
+	mov [CPUbrand],eax
+	mov [CPUbrand+4],ebx
+	mov [CPUbrand+8],ecx
+	mov [CPUbrand+12],edx
+
+	mov eax,0x80000003
+	cpuid
+	mov [CPUbrand+16],eax
+	mov [CPUbrand+20],ebx
+	mov [CPUbrand+24],ecx
+	mov [CPUbrand+28],edx
+
+	mov eax,0x80000004
+	cpuid
+	mov [CPUbrand+32],eax
+	mov [CPUbrand+36],ebx
+	mov [CPUbrand+40],ecx
+	mov [CPUbrand+44],edx
+
+	call _display_endl
+	mov si, strProcessor
+	mov al,0x01
+    int 0x21
+	call _display_space
+	mov si, CPUbrand
+	mov al,0x01
+    int 0x21
+	ret
+;end
+	
+_show_floppy_info:
+	
+	;*****************display floppy driver information
+	;read whether the floppy drives are availabe and if so show the number of available drives
+	
+	call _display_endl
+	mov si, strFloppyD
+	mov al, 0x01
+    int 0x21
+    	call _display_space
+    	xor ax, ax
+    int 0x11
+    	and ax, 0x01			;get first bit
+    	cmp ax, 0x01			;if the first bit is 1
+    	je _available_floppyD		;show the available number of floppy drives
+    	jmp _no_floppyD			;if no floppy drives are available
+    	ret
+    	
+_no_floppyD:
+	;if no floppy drives are available print 0
+    	mov ah, 0x0e
+    	mov al, '0'
+    int 0x10
+    	ret
+    		
+_available_floppyD:
+	;send interrupt 11h and read the 6-7 bits from the ax register to read the available number of floppy drives 
+	
+    	xor ax, ax
+    int 0x11			;send the interrupt, it sets the ax register
+    	and ax, 0xc0		;get the 6-7 bits
+    	shr ax, 6		;shift right 6 bits
+    	add al, 0x31		;add 49 because the bit indicates [No of floppy drives - 1]
+    	mov ah, 0x0e
+    int 0x10 
+    	ret
+    	
+;end
+   	
+_show_serial_info:    	    	  		
+	;*****************display available number of serial ports
+	;send interrupt 11h to get the equipment list to the ax register and read bits from 9 - 11
+	;to read the number of available serial ports
+	
+	call _display_endl
+	mov si, strSerialPorts
+	mov al,0x01
+    int 0x21
+    	call _display_space
+	xor ax, ax		;clear the ax register
+    int 0x11			;send the interrupt, it sets the ax register
+	and ax, 0x0e00             ;keep the bits 9-11
+	shr ax, 9	  	   ;shift 9 bits right                  
+	add al, 0x30               ;add 48 and convert to decimal
+	mov ah, 0x0e
+    int 0x10
+   	ret
+   
+;end
+   	
+_show_parallel_info:
+   	;*****************display available number of parallel ports
+   	;send interrupt 11h to get the equipment list to the ax register and read the bits from 14 - 15
+   	;to read the number of available parallel ports 
+   	
+    	call _display_endl
+    	mov si, strParallelPorts
+    	mov al,0x01
+    int 0x21
+    	call _display_space
+	xor ax, ax
+    int 0x11			;send the interrupt, it sets the ax register
+	and ax, 0x0c000            ;keep the bits 14-15
+    	shr ax, 14		   ;shift 14 bits right 
+    	add al, 0x30
+    	mov ah, 0x0e
+    int 0x10
+    	ret
+    	
+;end
+    	
+_show_memory_info:
+    	;*******************display lower memory size
+    	;read the offset 13h of the 0040:0000h to get the Memory size in KB
+    	
+    	call _display_endl
+    	mov si, strLowerMemory
+    	mov al, 0x01
+    int 0x21
+    	
+    	call _display_space
+	
+	push es
+	mov ax, 0x40
+	mov es, ax
+	mov ax, [es:13h]	;13h offset from 0040:0000h includes the lower memory size
+	mov dx, ax
+	call _display_space
+	call _hexToDec
+	mov si, strKB
+	mov al, 0x01
+    int 0x21
+	
+	pop es
+    	
+    	call _display_endl
+    	
+    	xor cx, cx			;clear cx
+	xor dx, dx			;clear dx
+	mov ax, 0xe801
+    int 0x15
+	jc _MemErr		; CF set on error
+	cmp ah, 0x86		; unsupported function
+	je _MemErr
+	cmp ah, 0x80		; invalid command
+	je _MemErr
+
+	mov si, strUpperMemory
+	mov al, 0x01
+    int 0x21
+	
+	call _display_space
+	
+	cmp cx, 0x0000		;if CX=0
+	je _remove_cx_conflict
+	jmp _memCalculate
+
+_remove_cx_conflict:		
+	;some bioses return CX=BX=0 if so copy ax to cx and bx to dx
+	mov cx,ax		
+	mov dx,bx
+
+_memCalculate:
+	;Now CX = configured memory 1M to 16M, in K
+	;Now DX = configured memory above 16M, in 64K blocks
+	;configured memory above 16M in MBs = DX*64/1024 = (DX/2^4)
+	shr dx, 4		;divide dx by 2^4 or shift 4 bits right
+	shr cx, 10		;divide cx by 2^10 or shift 10 bits right
+	add cx,dx		;total memory
+
+	mov dx, cx		;move total memory size to dx
+	call _hexToDec		;convert hex to decimal	
+	mov si, strMB
+	mov al, 0x01
+    int 0x21
+
+	ret
+		
+_MemErr:
+	mov si, strMemErr	;in case an error occured while reading memory
+	mov al, 0x01
+    int 0x21
+		
+;end
+
+_show_HDD_info:
+	;***********************display no of available HDD
+	;read the offset 75h of the 0040:0000h to get the number of available HDDs
+	
+	call _display_endl
+	mov si, strNoOfHDD	;print string stored in the strNoOfHDD
+	mov al, 0x01
+    int 0x21
+    	call _display_space
+    	
+    	push es			;save the current values of the es register
+    	mov ax, 0x40		;get the address no 0x40 to the ax register
+    	mov es, ax		;move ax to the es
+    	mov al, [es:75h]	;get the required offset to display no of HDD
+    	add al, 0x30		;convert the number to ASCII by adding 48(decimal) = 0x30
+    	mov ah, 0x0e		;print the number
+    int 0x10
+    	
+    	pop es			;restore the value stored in the es register
+	call _display_endl
+    	
+    	ret
+;end
+
+
+_display_help:			;display the help
+	call _display_endl
+    int 0x21
+	call _display_endl
+	mov si, strHelp3
+	mov al, 0x01
+    int 0x21
+        call _display_endl
+    ret
+
+;end
+
+;*****************************************************************************
+_hexToDec:			;convert hex to decimal
+	push ax
+	push bx
+	push cx
+	push si
+	mov ax,dx                ;copy number into AX
+	mov si,10                ;SI will be our divisor
+	xor cx,cx                ;clean up the CX
+
+_non_zero:
+
+	xor dx,dx                ;clean up the DX
+	div si                   ;divide by 10
+	push dx                  ;push number onto the stack
+	inc cx                   ;increment CX to do it more times
+	or ax,ax                 ;end of the number?
+	jne _non_zero		 ;if not go to _non_zero
+
+_write_digits:
+
+	pop dx                    ;get the digit off DX
+	add dl,0x30               ;add 48 to get the ASCII value
+	call _print_char          ;print 
+	loop _write_digits        ;keep going till cx == 0
+
+	pop si                   ;restore SI
+	pop cx                   ;restore DX
+	pop bx                   ;restore CX
+	pop ax                   ;restore AX
+	ret                      
+
 _print_char:
-	push ax			; save AX 
+	push ax                 ;save the current AX register
 	mov al, dl
-        mov ah, 0x0E		; BIOS teletype acts on printing char
+        mov ah, 0x0E            ;BIOS teletype acts on newline
         mov bh, 0x00
         mov bl, 0x07
-        int 0x10
+    int 0x10
 
-	pop ax			; restore AX
+	pop ax                  ;restore the AX register
 	ret
-	
-_prepare_digits:
+;end
 
-	pop dx			; get the digit from DX
-	add dl,0x30		; add 30 to get the ASCII value
-	call _print_char	; print char
-	loop _prepare_digits	; loop till cx == 0
-
-	pop si			; restore SI
-	pop cx			; restore CX
-	pop ax			; restore AX
-	ret                
-
+;************************************************************************************************
 [SEGMENT .data]
-    strWelcomeMsg   db  "Welcome to KEERTH_OS , Created by Keerthan- Enter 'help' to display commands", 0x00
-	strPrompt		db	"KEERTH_OS>>", 0x00
+    strWelcomeMsg   db  "Welcome to KEERTH_OS, created by keerththanan . Enter 'menu' to dispaly menu", 0x00
+	strPrompt		db	"KEERTH_OS>", 0x00
 	cmdMaxLen		db	255			;maximum length of commands
 
-	strOsName		db	"KEERTH_OS", 0x00	;OS details
-	strMajorVer		db	"1", 0x00
-	strMinorVer		db	".0.1", 0x00
+	strHInfo		db	"Hardware information:", 0x00
+	
+	strVendorID		db	" CPU Vendor ID:", 0x00
+	strProcessor		db	" Processor:", 0x00
+	strSerialPorts		db	" Serial ports:", 0x00
+	strParallelPorts	db	" Parallel ports:", 0x00
+	strFloppyD		db	" Floppy drives:", 0x00
+	strLowerMemory		db	" Lower memory size:", 0x00
+	strUpperMemory		db	" Upper memory size:", 0x00
+	strKB			db	"KB", 0x00
+	strMB			db	"MB", 0x00
+	strNoOfHDD		db	" No of Hard Disk Drives:", 0x00
+	
+	strMemErr		db	"Error reading the memory size.", 0x00
+	
+	strHelp3		db	"hwinfo    --> Display hardware information", 0x00
 
-	cmdVer			db	"version", 0x00		; internal commands
-	cmdExit		db	"exit", 0x00
-	cmdHelp		db	"help", 0x00
-	cmdInfo		db	"info",0x00
-	
-	
-	strHelpMsg1		db  "Type version to display version",0x00
-	strHelpMsg2		db  "Type info for displaying Hardware informations of the machine",0x00
-	strHelpMsg3		db  "Type exit rebooting the system",0x00
-	strInfoTitle		db  "Hardware Information",0x00
-	strTitleDesign	db  "==============================",0x00
-	strcpuid		db	"CPU Vendor : ", 0x00
-	strtypecpu		db	"CPU Type: ", 0x00
-	strcpuserial	db	"CPU Serial No : ",0x00
-	strhdnumber		db	"Number of hard drives: ",0x00
-	strserialportnumber	db	"Number of serial ports: ", 0x00
-	strserialport1		db	"Base I/O address for serial port 1 (communications port 1 - COM 1): ", 0x00
-	strtotalmemory	db	"Total memory: ",0x00
-	strbasememory		db	"Base memory: ",0x00
-	strmemory		db	"Base Memory size: ", 0x00
-	strsmallextended	db	"Extended memory between(1M - 16M): ", 0x00
-	strbigextended		db      "Extended memory above 16M: ", 0x00
+	cmdHInfo		db	"hwinfo", 0x00		;view hardware information
+	cmdHelp			db	"menu", 0x00		;view help
 
 	txtVersion		db	"version", 0x00	;messages and other strings
-	msgUnknownCmd		db	"Unknown command or bad file name!", 0x00
+	msgUnknownCmd	db	"Unknown command or bad file name!", 0x00
 
 [SEGMENT .bss]
-	strUserCmd		resb	256		;buffer for user commands
-	cmdChrCnt		resb	1		;count of characters
+	vendorID	resb	12		;CPU vendor ID
+	CPUbrand	resb	48		;CPU brand
+	strUserCmd	resb	256		;buffer for user commands
+	cmdChrCnt	resb	1		;count of characters
 	strCmd0		resb	256		;buffers for the command components
 	strCmd1		resb	256
 	strCmd2		resb	256
 	strCmd3		resb	256
 	strCmd4		resb	256
-	strVendorID		resb	16
-	strcputype		resb	64
-	strcpusno		resb 	64
-	basemem		resb	2
-	extmem1		resb	2
-	extmem2		resb	2
-
-
-
-;********************end of the kernel code********************
